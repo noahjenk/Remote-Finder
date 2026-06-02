@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, ZoomControl, useMap } from 'react-leaflet'
+import {
+  GeoJSON,
+  MapContainer,
+  TileLayer,
+  ZoomControl,
+  useMap,
+} from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import './App.css'
 import L from 'leaflet'
+import osmtogeojson from 'osmtogeojson'
+import { buffer as turfBuffer, dissolve as turfDissolve } from '@turf/turf'
 
 const DISCLAIMER_STORAGE_KEY = 'remoteFinderDisclaimerDismissed'
 
@@ -15,12 +23,36 @@ function formatRadius(radiusMetres) {
   return `${radiusKm.toFixed(1)}km`
 }
 
+function MapWatcher({ onMapMove }) {
+  const map = useMap()
+
+  useEffect(() => {
+    function handleMove() {
+      onMapMove()
+    }
+
+    map.on('moveend', handleMove)
+    map.on('zoomend', handleMove)
+
+    return () => {
+      map.off('moveend', handleMove)
+      map.off('zoomend', handleMove)
+    }
+  }, [map, onMapMove])
+
+  return null
+}
+
 function MapControls({
   radiusMetres,
   onRadiusChange,
   onSearchBuildings,
   loadingBuildings,
-  buildingError,
+  statusMessage,
+  statusType,
+  showBuildings,
+  onToggleBuildings,
+  mapMovedSinceSearch,
 }) {
   const map = useMap()
   const controlsRef = useRef(null)
@@ -85,13 +117,39 @@ function MapControls({
           {loadingBuildings ? 'Searching...' : 'Search this area'}
         </button>
 
-        {loadingBuildings && (
-          <p className="status-message">Loading mapped buildings...</p>
+        {mapMovedSinceSearch && !loadingBuildings && (
+          <p className="status-message warning-message">
+            Map moved since the last search. Click Search this area to refresh.
+          </p>
         )}
 
-        {buildingError && (
-          <p className="status-message error-message">{buildingError}</p>
+        {statusMessage && !loadingBuildings && (
+          <p
+            className={`status-message ${
+              statusType === 'error'
+                ? 'error-message'
+                : statusType === 'success'
+                ? 'success-message'
+                : statusType === 'empty'
+                ? 'empty-message'
+                : ''
+            }`}
+          >
+            {statusMessage}
+          </p>
         )}
+
+        <div className="toggle-row">
+          <label htmlFor="show-buildings-toggle">
+            <input
+              id="show-buildings-toggle"
+              type="checkbox"
+              checked={showBuildings}
+              onChange={onToggleBuildings}
+            />
+            Show building outlines
+          </label>
+        </div>
       </div>
     </div>
   )
@@ -102,10 +160,14 @@ function App() {
 
   const [showDisclaimer, setShowDisclaimer] = useState(false)
   const [radiusMetres, setRadiusMetres] = useState(500)
-
-  const [buildingsData, setBuildingsData] = useState(null)
+  const [showBuildings, setShowBuildings] = useState(true)
+  const [buildingsGeoJSON, setBuildingsGeoJSON] = useState(null)
+  const [bufferGeoJSON, setBufferGeoJSON] = useState(null)
   const [loadingBuildings, setLoadingBuildings] = useState(false)
-  const [buildingError, setBuildingError] = useState('')
+  const [statusMessage, setStatusMessage] = useState('')
+  const [statusType, setStatusType] = useState('')
+  const [hasSearched, setHasSearched] = useState(false)
+  const [mapMovedSinceSearch, setMapMovedSinceSearch] = useState(false)
 
   useEffect(() => {
     const hasDismissedDisclaimer = localStorage.getItem(
@@ -126,9 +188,21 @@ function App() {
     setRadiusMetres(Number(event.target.value))
   }
 
+  function handleToggleBuildings(event) {
+    setShowBuildings(event.target.checked)
+  }
+
+  function handleMapMove() {
+    if (hasSearched && !loadingBuildings) {
+      setMapMovedSinceSearch(true)
+    }
+  }
+
   async function searchBuildings(bounds) {
     setLoadingBuildings(true)
-    setBuildingError('')
+    setStatusMessage('Loading mapped buildings...')
+    setStatusType('loading')
+    setMapMovedSinceSearch(false)
 
     const overpassQuery = `
       [out:json][timeout:25];
@@ -151,18 +225,76 @@ function App() {
         throw new Error('The building search failed.')
       }
 
-      const data = await response.json()
+      const rawData = await response.json()
+      const convertedGeoJSON = osmtogeojson(rawData)
+      const buildingFeatures = (convertedGeoJSON.features || []).filter(
+        (feature) => feature.geometry,
+      )
+      const geojson = {
+        type: 'FeatureCollection',
+        features: buildingFeatures,
+      }
 
-      setBuildingsData(data)
+      setBuildingsGeoJSON(geojson)
+      setHasSearched(true)
 
-      console.log('Fetched OSM building data:', data)
+      if (buildingFeatures.length === 0) {
+        setStatusMessage('No buildings found in this view.')
+        setStatusType('empty')
+      } else {
+        setStatusMessage(
+          `Loaded ${buildingFeatures.length} building outline${
+            buildingFeatures.length === 1 ? '' : 's'
+          }.`,
+        )
+        setStatusType('success')
+      }
+
+      console.log('Fetched OSM building data:', rawData)
+      console.log('Converted building GeoJSON:', geojson)
     } catch (error) {
       console.error(error)
-      setBuildingError('Could not load buildings. Try again or zoom in.')
+      setBuildingsGeoJSON(null)
+      setBufferGeoJSON(null)
+      setStatusMessage('Could not load buildings. Try again or zoom in.')
+      setStatusType('error')
     } finally {
       setLoadingBuildings(false)
     }
   }
+
+  useEffect(() => {
+    if (!buildingsGeoJSON || radiusMetres === 0) {
+      setBufferGeoJSON(null)
+      return
+    }
+
+    try {
+      const bufferFeatures = buildingsGeoJSON.features
+        .map((feature) => turfBuffer(feature, radiusMetres, { units: 'meters' }))
+        .filter(Boolean)
+
+      if (bufferFeatures.length === 0) {
+        setBufferGeoJSON(null)
+        return
+      }
+
+      const bufferCollection = {
+        type: 'FeatureCollection',
+        features: bufferFeatures,
+      }
+
+      const mergedFeature = turfDissolve(bufferCollection)
+      setBufferGeoJSON(mergedFeature)
+    } catch (error) {
+      console.error('Buffer merge failed:', error)
+      const fallbackFeatures = buildingsGeoJSON.features
+        .map((feature) => turfBuffer(feature, radiusMetres, { units: 'meters' }))
+        .filter(Boolean)
+
+      setBufferGeoJSON({ type: 'FeatureCollection', features: fallbackFeatures })
+    }
+  }, [buildingsGeoJSON, radiusMetres])
 
   return (
     <div className="app">
@@ -178,14 +310,42 @@ function App() {
         />
 
         <ZoomControl position="bottomright" />
+        <MapWatcher onMapMove={handleMapMove} />
 
         <MapControls
           radiusMetres={radiusMetres}
           onRadiusChange={handleRadiusChange}
           onSearchBuildings={searchBuildings}
           loadingBuildings={loadingBuildings}
-          buildingError={buildingError}
+          statusMessage={statusMessage}
+          statusType={statusType}
+          showBuildings={showBuildings}
+          onToggleBuildings={handleToggleBuildings}
+          mapMovedSinceSearch={mapMovedSinceSearch}
         />
+
+        {bufferGeoJSON && (
+          <GeoJSON
+            data={bufferGeoJSON}
+            style={{
+              fillColor: '#ea5252',
+              color: '#b3261e',
+              weight: 1,
+              fillOpacity: 0.22,
+            }}
+          />
+        )}
+
+        {showBuildings && buildingsGeoJSON && (
+          <GeoJSON
+            data={buildingsGeoJSON}
+            style={{
+              color: '#1b4f72',
+              weight: 2,
+              fillOpacity: 0,
+            }}
+          />
+        )}
       </MapContainer>
 
       {showDisclaimer && (
