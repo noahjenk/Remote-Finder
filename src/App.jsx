@@ -11,6 +11,7 @@ import './App.css'
 import L from 'leaflet'
 import osmtogeojson from 'osmtogeojson'
 import { buffer as turfBuffer, dissolve as turfDissolve } from '@turf/turf'
+import { filterBuildingsByMode } from './utils/buildingFilters'
 
 const DISCLAIMER_STORAGE_KEY = 'remoteFinderDisclaimerDismissed'
 
@@ -53,6 +54,9 @@ function MapControls({
   showBuildings,
   onToggleBuildings,
   mapMovedSinceSearch,
+  buildingCount,
+  buildingFilter,
+  onBuildingFilterChange,
 }) {
   const map = useMap()
   const controlsRef = useRef(null)
@@ -117,6 +121,33 @@ function MapControls({
           {loadingBuildings ? 'Searching...' : 'Search this area'}
         </button>
 
+        <p className="status-message">
+          Buildings loaded: {buildingCount}
+        </p>
+
+        <div className="toggle-row">
+          <label htmlFor="building-filter-select">
+            Building filter
+            <select
+              id="building-filter-select"
+              value={buildingFilter}
+              onChange={onBuildingFilterChange}
+            >
+              <option value="all">All buildings</option>
+              <option value="likelyResidential">
+                Likely residential / occupied buildings
+              </option>
+            </select>
+          </label>
+        </div>
+
+        <p className="status-message">
+          Selected filter:{' '}
+          {buildingFilter === 'likelyResidential'
+            ? 'Likely residential / occupied buildings'
+            : 'All buildings'}
+        </p>
+
         {mapMovedSinceSearch && !loadingBuildings && (
           <p className="status-message warning-message">
             Map moved since the last search. Click Search this area to refresh.
@@ -161,6 +192,7 @@ function App() {
   const [showDisclaimer, setShowDisclaimer] = useState(false)
   const [radiusMetres, setRadiusMetres] = useState(500)
   const [showBuildings, setShowBuildings] = useState(true)
+  const [buildingFilter, setBuildingFilter] = useState('all')
   const [buildingsGeoJSON, setBuildingsGeoJSON] = useState(null)
   const [bufferGeoJSON, setBufferGeoJSON] = useState(null)
   const [loadingBuildings, setLoadingBuildings] = useState(false)
@@ -191,6 +223,21 @@ function App() {
   function handleToggleBuildings(event) {
     setShowBuildings(event.target.checked)
   }
+
+  function handleBuildingFilterChange(event) {
+    setBuildingFilter(event.target.value)
+  }
+
+  const filteredBuildingFeatures = filterBuildingsByMode(
+    buildingsGeoJSON?.features,
+    buildingFilter,
+  )
+
+  const filteredBuildingsGeoJSON = buildingsGeoJSON
+    ? { ...buildingsGeoJSON, features: filteredBuildingFeatures }
+    : null
+
+  const filteredBuildingCount = filteredBuildingFeatures.length
 
   function handleMapMove() {
     if (hasSearched && !loadingBuildings) {
@@ -322,6 +369,9 @@ function App() {
           showBuildings={showBuildings}
           onToggleBuildings={handleToggleBuildings}
           mapMovedSinceSearch={mapMovedSinceSearch}
+          buildingCount={filteredBuildingCount}
+          buildingFilter={buildingFilter}
+          onBuildingFilterChange={handleBuildingFilterChange}
         />
 
         {bufferGeoJSON && (
@@ -336,9 +386,9 @@ function App() {
           />
         )}
 
-        {showBuildings && buildingsGeoJSON && (
+        {showBuildings && filteredBuildingsGeoJSON && (
           <GeoJSON
-            data={buildingsGeoJSON}
+            data={filteredBuildingsGeoJSON}
             style={{
               color: '#1b4f72',
               weight: 2,
