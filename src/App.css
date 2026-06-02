@@ -212,3 +212,39 @@
 .error-message {
   color: #b3261e;
 }
+
+.success-message {
+  color: #165b33;
+}
+
+.empty-message {
+  color: #5d6870;
+}
+
+.warning-message {
+  color: #a7701e;
+}
+
+.toggle-row {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.toggle-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  color: #101418;
+  font-size: 0.95rem;
+}
+
+.toggle-row input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #101418;
+}
+
+/* Dark mode styles removed */
