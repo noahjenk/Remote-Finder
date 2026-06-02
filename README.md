@@ -1,35 +1,16 @@
-# Remote Finder
+# React + Vite
 
-Remote Finder is an open-source web mapping tool for exploring areas that are farther away from mapped buildings and other signs of human presence.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-The app is intended as a planning and scouting tool. It does not confirm land ownership, legal access, permission, hazards, safety, or suitability for any activity.
+Currently, two official plugins are available:
 
-## Core idea
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-Remote Finder shows an interactive map. Users can load mapped building data for the visible area, adjust a radius, and see shaded avoid zones around those features. Clear areas are farther away from the selected mapped features.
+## React Compiler
 
-## Planned features
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-- Interactive browser map
-- OpenStreetMap-based building data
-- Adjustable radius slider
-- Shaded avoid zones
-- Clean merged avoid-zone boundary
-- Optional building outlines
-- Pins, notes, lines, and drawn areas
-- Saved projects
-- Shareable view-only project links
-- Mobile-friendly version later
-- Offline scouting mode later
+## Expanding the ESLint configuration
 
-## Current status
-
-Early planning stage. The first goal is to build a simple browser prototype that proves the core map and radius idea.
-
-## Important disclaimer
-
-Remote Finder shows distance from mapped features only. It does not confirm land ownership, legal access, permission, hazards, safety, or suitability for any activity.
-
-## Contributing
-
-Contributions will be welcome once the first prototype structure is in place.
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
