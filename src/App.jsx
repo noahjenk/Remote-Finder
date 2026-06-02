@@ -5,9 +5,19 @@ import './App.css'
 
 const DISCLAIMER_STORAGE_KEY = 'remoteFinderDisclaimerDismissed'
 
+function formatRadius(radiusMetres) {
+  if (radiusMetres < 1000) {
+    return `${radiusMetres}m`
+  }
+
+  const radiusKm = radiusMetres / 1000
+  return `${radiusKm.toFixed(1)}km`
+}
+
 function App() {
   const defaultPosition = [54.508, -1.55]
   const [showDisclaimer, setShowDisclaimer] = useState(false)
+  const [radiusMetres, setRadiusMetres] = useState(500)
 
   useEffect(() => {
     const hasDismissedDisclaimer = localStorage.getItem(DISCLAIMER_STORAGE_KEY)
@@ -20,6 +30,10 @@ function App() {
   function dismissDisclaimer() {
     localStorage.setItem(DISCLAIMER_STORAGE_KEY, 'true')
     setShowDisclaimer(false)
+  }
+
+  function handleRadiusChange(event) {
+    setRadiusMetres(Number(event.target.value))
   }
 
   return (
@@ -39,6 +53,38 @@ function App() {
 
         <ZoomControl position="bottomright" />
       </MapContainer>
+
+      <section className="control-panel">
+        <div className="control-panel-header">
+          <div>
+            <p className="control-label">Avoid radius</p>
+            <h1>{formatRadius(radiusMetres)}</h1>
+          </div>
+        </div>
+
+        <label className="slider-label" htmlFor="radius-slider">
+          Distance from mapped features
+        </label>
+
+        <input
+          id="radius-slider"
+          type="range"
+          min="0"
+          max="2000"
+          step="50"
+          value={radiusMetres}
+          onChange={handleRadiusChange}
+        />
+
+        <div className="slider-values">
+          <span>0m</span>
+          <span>2km</span>
+        </div>
+
+        <p className="control-help">
+          Shaded avoid zones will use this distance once building data is added.
+        </p>
+      </section>
 
       {showDisclaimer && (
         <div className="disclaimer-backdrop">
