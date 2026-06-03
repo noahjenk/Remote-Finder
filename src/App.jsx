@@ -13,6 +13,7 @@ import osmtogeojson from 'osmtogeojson'
 import { buffer as turfBuffer, dissolve as turfDissolve } from '@turf/turf'
 
 const DISCLAIMER_STORAGE_KEY = 'remoteFinderDisclaimerDismissed'
+const MAX_SEARCH_AREA_KM2 = 200
 
 function formatRadius(radiusMetres) {
   if (radiusMetres < 1000) {
@@ -23,12 +24,28 @@ function formatRadius(radiusMetres) {
   return `${radiusKm.toFixed(1)}km`
 }
 
+function calculateBoundsAreaKm2(bounds) {
+  const lat1 = bounds.south
+  const lat2 = bounds.north
+  const lon1 = bounds.west
+  const lon2 = bounds.east
+
+  const latAvg = (lat1 + lat2) / 2
+  const kmPerDegLat = 110.574
+  const kmPerDegLon = 111.320 * Math.cos((latAvg * Math.PI) / 180)
+
+  const heightKm = Math.abs(lat2 - lat1) * kmPerDegLat
+  const widthKm = Math.abs(lon2 - lon1) * kmPerDegLon
+
+  return heightKm * widthKm
+}
+
 function MapWatcher({ onMapMove }) {
   const map = useMap()
 
   useEffect(() => {
     function handleMove() {
-      onMapMove()
+      onMapMove(map.getBounds())
     }
 
     map.on('moveend', handleMove)
@@ -53,6 +70,8 @@ function MapControls({
   showBuildings,
   onToggleBuildings,
   mapMovedSinceSearch,
+  areaTooLarge,
+  areaKm2,
 }) {
   const map = useMap()
   const controlsRef = useRef(null)
@@ -112,12 +131,18 @@ function MapControls({
           className="search-button"
           type="button"
           onClick={handleSearchClick}
-          disabled={loadingBuildings}
+          disabled={loadingBuildings || areaTooLarge}
         >
           {loadingBuildings ? 'Searching...' : 'Search this area'}
         </button>
 
-        {mapMovedSinceSearch && !loadingBuildings && (
+        {areaTooLarge && !loadingBuildings && (
+          <p className="status-message warning-message">
+            The current view is too large ({areaKm2.toFixed(0)} km²). Zoom in or move closer before searching.
+          </p>
+        )}
+
+        {!areaTooLarge && mapMovedSinceSearch && !loadingBuildings && (
           <p className="status-message warning-message">
             Map moved since the last search. Click Search this area to refresh.
           </p>
@@ -132,6 +157,8 @@ function MapControls({
                 ? 'success-message'
                 : statusType === 'empty'
                 ? 'empty-message'
+                : statusType === 'warning'
+                ? 'warning-message'
                 : ''
             }`}
           >
@@ -192,13 +219,32 @@ function App() {
     setShowBuildings(event.target.checked)
   }
 
-  function handleMapMove() {
+  const [currentBounds, setCurrentBounds] = useState(null)
+
+  const areaKm2 = currentBounds ? calculateBoundsAreaKm2(currentBounds) : 0
+  const areaTooLarge = currentBounds
+    ? areaKm2 > MAX_SEARCH_AREA_KM2
+    : false
+
+  function handleMapMove(bounds) {
+    setCurrentBounds(bounds)
     if (hasSearched && !loadingBuildings) {
       setMapMovedSinceSearch(true)
     }
   }
 
   async function searchBuildings(bounds) {
+    const searchArea = calculateBoundsAreaKm2(bounds)
+
+    if (searchArea > MAX_SEARCH_AREA_KM2) {
+      setStatusMessage(
+        `The current view is too large (${searchArea.toFixed(0)} km²). Zoom in or move closer before searching.`,
+      )
+      setStatusType('warning')
+      setLoadingBuildings(false)
+      return
+    }
+
     setLoadingBuildings(true)
     setStatusMessage('Loading mapped buildings...')
     setStatusType('loading')
@@ -322,6 +368,8 @@ function App() {
           showBuildings={showBuildings}
           onToggleBuildings={handleToggleBuildings}
           mapMovedSinceSearch={mapMovedSinceSearch}
+          areaTooLarge={areaTooLarge}
+          areaKm2={areaKm2}
         />
 
         {bufferGeoJSON && (

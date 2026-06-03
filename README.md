@@ -15,27 +15,46 @@ Clear areas are farther away from the selected mapped features.
 The current prototype includes:
 
 * React + Vite web app
-* Full-screen OpenStreetMap basemap
+* Leaflet/OpenStreetMap basemap
 * First-load disclaimer popup
 * Adjustable radius slider
+* Manual “Search this area” workflow
+* Overpass query for `building=*`
+* Building outlines display
+* Buffer avoid zones around buildings
+* Merged/dissolved avoid-zone visualisation
+* Loading, error, and empty-result states
+* Warning when the map has moved since last search
 
-## Planned features
+## Not current priorities
 
-* Fetch OpenStreetMap building data for the visible map area
-* Draw building outlines
-* Create shaded avoid zones around mapped features
-* Merge avoid zones into one clean combined shape
-* Add optional filters for different building and human-presence layers
-* Add pins, notes, lines, and drawn areas
-* Add saved projects and shareable view-only links
-* Improve mobile support
-* Explore offline scouting features later
+The prototype does not currently focus on:
+
+* Dark mode
+* Accounts or saved projects
+* Sharing links
+* Mobile app support
+* Offline mode
+* Satellite imagery layers
+* Direct OpenStreetMap editing
+* Complex remoteness scoring or “best area” recommendations
 
 ## Important disclaimer
 
 Remote Finder shows distance from mapped features only. It does not confirm land ownership, legal access, permission, hazards, safety, or suitability for any activity.
 
 OpenStreetMap data may be incomplete, outdated, or inconsistently tagged.
+
+## Development
+
+To run the app locally:
+
+```bash
+npm install
+npm run dev
+```
+
+Open the local Vite URL shown in the terminal.
 
 ## Development status
 
@@ -45,10 +64,12 @@ Current milestone:
 
 **Prototype v0.1 — Core Map Demo**
 
-The first goal is to prove the main concept: a browser map with a radius slider and shaded avoid zones based on mapped building data.
+The goal is to prove the main workflow:
+
+map → radius slider → manual search → building outlines → avoid-zone buffers → merged shaded areas.
 
 ## Open source
 
 Remote Finder is open source under the MIT License.
 
-Contributions, ideas, bug reports, and improvements will be welcome as the project develops.
+Contributions, ideas, bug reports, and improvements are welcome as the project develops.
